@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>1D 3D Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script>
+    /**
+    I'm trying to make a 3D-looking game in one dimension. It sucks but it works.
+    Bugs: 
+    - You can sometimes get caught on corners
+    - It's hard to perceive depth
+    Controls: WASD to move, LEFT & RIGHT arrows to turn. 
+    Hold SHIFT to display map.
+    */
+    let map1 = [
+      'wwwwwwwwwwwwwwwwwwww',
+      'w        w         w',
+      'w   ww   w         w',
+      'w        w   w     w',
+      'w   ww             w',
+      'w   ww      w  w   w',
+      'w        w     w   w',
+      'w   ww   w     w   w',
+      'w        w     w   w',
+      'w        w         w',
+      'w        w    ww   w',
+      'wwww  wwww         w',
+      'w                  w',
+      'w                  w',
+      'w  w  w  w  w  w  ww',
+      'w                  w',
+      'w w      w    ww   w',
+      'w  wwwwww          w',
+      'w           ww     w',
+      'wwwwwwwwwwwwwwwwwwww',
+    ], keys = {}, walls = [], sp = 0.5;
+
+    function rectCollide(x1, y1, w1, h1, x2, y2, w2, h2) {
+      return (x1 + w1 > x2 && y1 + h1 > y2 && x1 < x2 + w2 && y1 < y2 + h2);
+    }
+
+    function wall(x, y) {
+      this.p = createVector(x, y);
+      walls.push(this);
+    }
+
+    function setmap() {
+      for (let i in map1) {
+        for (let j in map1[i]) {
+          if (map1[i][j] === 'w') {
+            new wall(j * 20, i * 20);
+          }
+        }
+      }
+    }
+
+    function ray(x, y, r) {
+      let e = createVector(x, y);
+      let rayhit = false, distance = 0;
+      while (!rayhit && distance < 102) {
+        e.add(cos(r) * 1, sin(r) * 1);
+        for (let i in walls) {
+          if (rectCollide(e.x - 2, e.y - 2, 4, 4, walls[i].p.x, walls[i].p.y, 20, 20)) {
+            rayhit = true;
+          }
+        }
+        distance++;
+      }
+      return e;
+    }
+
+    function Player() {
+      this.p = createVector(50, 50);
+      this.v = createVector(0, 0);
+      this.r = 0;
+      this.hits = new Array(40).fill(0);
+    }
+
+    Player.prototype.update = function () {
+      if (keys[87]) this.v.add(p5.Vector.fromAngle(radians(this.r)).mult(sp));
+      else if (keys[83]) this.v.sub(p5.Vector.fromAngle(radians(this.r)).mult(sp));
+      if (keys[68]) this.v.add(p5.Vector.fromAngle(radians(this.r + 90)).mult(sp));
+      else if (keys[65]) this.v.sub(p5.Vector.fromAngle(radians(this.r + 90)).mult(sp));
+
+      this.v.div(1.1);
+
+      if (keys[LEFT_ARROW]) this.r -= 5;
+      if (keys[RIGHT_ARROW]) this.r += 5;
+
+      for (let i in walls) {
+        if (rectCollide(this.p.x - 5, this.p.y - 5, 10, 10, walls[i].p.x, walls[i].p.y, 20, 20)) {
+          if (this.p.x > walls[i].p.x + 20) { this.v.x = 0; this.p.x = walls[i].p.x + 25; } else
+          if (this.p.x < walls[i].p.x) { this.v.x = 0; this.p.x = walls[i].p.x - 5; } else
+          if (this.p.y > walls[i].p.y + 20) { this.v.y = 0; this.p.y = walls[i].p.y + 25; } else
+          if (this.p.y < walls[i].p.y) { this.v.y = 0; this.p.y = walls[i].p.y - 5; }
+        }
+      }
+
+      for (let i in this.hits) {
+        this.hits[i] = p5.Vector.dist(this.p, ray(this.p.x, this.p.y, radians(this.r + ((i * 2) - 40))));
+      }
+
+      this.v.limit(2);
+      this.p.add(this.v);
+    };
+
+    let player;
+
+    function setup() {
+      createCanvas(600, 600);
+      setmap();
+      player = new Player();
+    }
+
+    function draw() {
+      background(255);
+      player.update();
+      let hitl = player.hits.length;
+      strokeWeight(15);
+      for (let i in player.hits) {
+        stroke(player.hits[i] * 2.5);
+        line(((i / hitl) * width) + 7, 0, ((i / hitl) * width) + 7, height);
+      }
+
+      fill(255, 0, 0);
+      text(frameRate().toFixed(1), 20, 20);
+
+      if (keys[SHIFT]) {
+        noStroke();
+        fill(255, 0, 0);
+        ellipse(player.p.x, player.p.y, 10, 10);
+        stroke(255, 0, 0);
+        strokeWeight(5);
+        line(player.p.x, player.p.y, player.p.x + cos(radians(player.r)) * 10, player.p.y + sin(radians(player.r)) * 10);
+        noStroke();
+        fill(0);
+        for (let i in walls) {
+          rect(walls[i].p.x, walls[i].p.y, 20, 20);
+        }
+      }
+    }
+
+    function keyPressed() {
+      keys[keyCode] = true;
+    }
+
+    function keyReleased() {
+      keys[keyCode] = false;
+    }
+  </script>
+</body>
+</html>
